@@ -1,2 +1,2 @@
 # Hikineet-Bot
- Discord Bot Test
+ Discord Bot for practice
