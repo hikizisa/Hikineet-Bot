@@ -44,6 +44,13 @@ except sqlite3.Error as error:
 
 bot = commands.Bot(command_prefix='!')
 
+def isInt(s):
+    try: 
+        int(s)
+        return True
+    except ValueError:
+        return False
+
 @bot.event
 async def on_ready():
     print(f'{bot.user} is connected to the following guild:\n')
@@ -82,11 +89,14 @@ async def on_message(message):
 
 @bot.command(name='roll')
 async def roll(ctx, max = 100, count = 1):
-    if max > 1000000000:
-        await ctx.send('너무 큰 수를 입력했습니다.')
+    if not (isInt(max) and isInt(count)):
+        await ctx.send('숫자를 입력해주세요.')
         return
-    if count > 20:
-        await ctx.send('주사위의 수가 너무 많습니다.')
+    if max > 1000000000 or max < 1:
+        await ctx.send('입력 숫자가 범위를 이탈했습니다.')
+        return
+    if count > 20 or count < 1:
+        await ctx.send('주사위의 수가 범위를 이탈했습니다.')
         return
 
     rng = ''
@@ -98,7 +108,10 @@ async def roll(ctx, max = 100, count = 1):
 @bot.command(pass_context = True , aliases=['vs'])
 async def choose(ctx, *args):
     str = ' '.join(args)
-    rng_array = str.split('|')
+    rng_array = list(filter(lambda x: x != '', str.split('|')))
+    if len(rng_array) <= 1:
+        await ctx.send('둘 이상의 선택지를 |로 구분해서 입력해주세요.')
+        return
     await ctx.send(random.choice(rng_array))
 
 '''
@@ -143,24 +156,41 @@ async def new_ranked_map(ctx, hrs = None):
         try:
             hours = int(hrs)
         except:
-            await ctx.send('숫자를 입력해주세요.')
+            await ctx.send('정수를 입력해주세요.')
             return
 
-        if hours > 7 * 24:
-            hours = 7 * 24
+        if hours > 200:
+            hours = 200
+        if hours < 0:
+            hours = 24
         time = now - timedelta(hours=hours)
 
     sql_time = time.strftime(sqlTimeFormat)
     args = [('since', sql_time), ('limit', '500')]
 
     url = 'https://osu.ppy.sh/api/get_beatmaps?' + osu_api_formatter(args)
-    response = requests.get(url)
+
+    try:
+        response = requests.get(url)
+    except requests.exceptions.HTTPError as http_err:
+        await ctx.send('API 요청에 실패했습니다.')
+        print(f'HTTP error occurred: {http_err}')
+
     map_data = response.json()
 
-    str = ''
+    str = '최근 {hours}시간 동안 랭크 된 맵:\n'
     map_titles = []
 
+    if len(map_data) == 0:
+        if hrs == None:
+            await ctx.send('마지막 확인 이후 랭크된 맵이 없습니다.')
+        else:
+            await ctx.send(hrs + '시간 동안 랭크된 맵이 없습니다.')
+	
     for beatmap in map_data:
+         if len(str) >= 2000:
+             str = str[0:2000]
+             break
          title = beatmap['title']
          if beatmap['approved'] != '1' or title in map_titles:
              continue
@@ -170,10 +200,5 @@ async def new_ranked_map(ctx, hrs = None):
 
     if str != '':
         await ctx.send(str)
-    else:
-        if hrs == None:
-            await ctx.send('마지막 확인 이후 랭크된 맵이 없습니다.')
-        else:
-            await ctx.send(hrs + '시간 동안 랭크된 맵이 없습니다.')
 
 bot.run(TOKEN)
