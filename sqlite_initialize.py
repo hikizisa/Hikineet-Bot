@@ -34,6 +34,15 @@ def init_osu_id_connection(cursor):
 
     for query in queries:
         execute_and_log(cursor, query)
+		
+def init_osu_verification(cursor):
+    queries = []
+
+    queries.append("DROP TABLE IF EXISTS OsuVerification;")
+    queries.append("CREATE TABLE IF NOT EXISTS OsuVerification (discord_id INT primary key, osu_id INT, osu_name STRING, verification_code STRING, time DATETIME);")
+
+    for query in queries:
+        execute_and_log(cursor, query)
 
 try:
     sqliteConnection = sqlite3.connect(DBPATH)
@@ -42,6 +51,7 @@ try:
 	
     init_last_update(cursor)
     init_osu_id_connection(cursor)
+    init_osu_verification(cursor)
 
     cursor.close()
 

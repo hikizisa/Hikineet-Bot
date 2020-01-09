@@ -1,8 +1,9 @@
 # bot.py
 import signal, sys,os
 import sqlite3
-import random
+import random, string
 from datetime import date, datetime, time, timedelta, timezone
+import urllib.parse
 
 import requests
 
@@ -14,6 +15,8 @@ load_dotenv()
 TOKEN = os.getenv('DISCORD_TOKEN')
 OSUAPI = os.getenv('OSU_TOKEN')
 DBPATH = os.getenv('DB_PATH')
+FORUMSID = os.getenv('FORUM_PM_SID')
+LOCALCHECK = os.getenv('LOCAL_USER_CHECK')
 
 def interrupt_handler(sig, frame):
     print("\n")
@@ -186,15 +189,15 @@ async def profile_pic(ctx, *args):
     await ctx.send(embed = embed)
 
 
-@bot.command(pass_context = True , aliases=['getosu'])
-async def get_osu_name(ctx, *args):
+@bot.command(pass_context = True , aliases=['osug'])
+async def get_osu(ctx, *args):
     userid = get_userid(args, ctx)
 
     if userid is None:
         await ctx.send('유저의 이름의 형식이 잘못되었습니다.')
         return
 
-    selectQuery = "SELECT osu_id, osu_name FROM OsuUserName where discord_id = ?"
+    selectQuery = "SELECT osu_id, osu_name FROM OsuUserName where discord_id = ?;"
     cursor.execute(selectQuery, (str(userid),))
     record = cursor.fetchall()
 	
@@ -209,7 +212,7 @@ async def get_osu_name(ctx, *args):
     await ctx.send(embed = embed)
 
 
-@bot.command(pass_context = True , aliases=['setosu'])
+@bot.command(pass_context = True , aliases=['osus'])
 async def set_osu_name(ctx, *args):
     if len(args) == 0:
         await ctx.send('osu! 닉네임이나 ID를 입력해주세요')
