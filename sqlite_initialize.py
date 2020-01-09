@@ -27,12 +27,21 @@ def init_last_update(cursor):
     for query in queries:
         execute_and_log(cursor, query)
 
+def init_osu_id_connection(cursor):
+    queries = []
+
+    queries.append("CREATE TABLE IF NOT EXISTS OsuUserName (discord_id INT primary key, osu_id INT, osu_name STRING);")
+
+    for query in queries:
+        execute_and_log(cursor, query)
+
 try:
     sqliteConnection = sqlite3.connect(DBPATH)
     cursor = sqliteConnection.cursor()
     print("Database created and Successfully Connected to SQLite")
 	
     init_last_update(cursor)
+    init_osu_id_connection(cursor)
 
     cursor.close()
 
