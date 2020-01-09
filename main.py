@@ -235,9 +235,16 @@ async def set_osu_name(ctx, *args):
     osu_name = user_data[0]['username']
     osu_id = user_data[0]['user_id']
 
-    selectQuery = "INSERT INTO OsuUserName (discord_id, osu_id, osu_name) VALUES (?, ?, ?)"
-    cursor.execute(selectQuery, (userid, osu_id, osu_name))
+    selectQuery = "SELECT osu_id, osu_name FROM OsuUserName where discord_id = ?"
+    cursor.execute(selectQuery, (str(userid),))
     record = cursor.fetchall()
+	
+    if len(record) == 0:
+        query = "INSERT INTO OsuUserName (osu_id, osu_name, discord_id) VALUES (?, ?, ?)"
+    else:
+        query = "UPDATE OsuUserName SET osu_id = ?, osu_name = ? WHERE discord_id = ?"
+
+    cursor.execute(query, (osu_id, osu_name, userid))
 	
     await ctx.send('osu! 계정이 설정되었습니다. : ' + osu_name)
 
