@@ -58,6 +58,7 @@ def isInt(s):
 
 @bot.event
 async def on_ready():
+    print(f'\nLogged in as: {bot.user.name} - {bot.user.id}\nVersion: {discord.__version__}\n')
     print(f'{bot.user} is connected to the following guild:\n')
     for guild in bot.guilds:
         print(
@@ -114,7 +115,7 @@ async def roll(ctx, max = 100, count = 1):
     await ctx.send(rng)
 
 
-@bot.command(pass_context = True , aliases=['vs'])
+@bot.command(aliases=['vs'])
 async def choose(ctx, *args):
     str = ' '.join(args)
     rng_array = list(filter(lambda x: x != '', str.split('|')))
@@ -122,6 +123,50 @@ async def choose(ctx, *args):
         await ctx.send('둘 이상의 선택지를 |로 구분해서 입력해주세요.')
         return
     await ctx.send(random.choice(rng_array))
+	
+
+@bot.command(name='gacha')
+async def gacha(ctx, ren = 10):
+    limit = 25
+
+    if not (isInt(ren)):
+        ren = 10
+    if ren > limit or ren < 1:
+        await ctx.send(str(limit) + '연차 이내만 가능합니다.')
+        return
+
+    rainbow = []
+    gold = []
+    silver = []
+
+    prob_rainbow = 2.5
+    prob_gold = 18
+
+    rainbow_emoji = '<:3sung:665296979420512299>'
+    silver_emoji = '<:sra:635880906242129970>'
+    gold_emoji = '<:sra1:635881449853288449>'
+
+    result = ''
+
+    for i in range(ren):
+        if i % 5 == 0:
+            result += '\n'
+
+        value = random.random() * 100
+
+        value -= prob_rainbow
+        if value < 0:
+            result += rainbow_emoji
+            continue
+
+        value -= prob_gold
+        if value < 0 or i % 10 == 9:
+            result += gold_emoji
+            continue
+
+        result += silver_emoji
+
+    await ctx.send(result)
 
 
 '''
@@ -187,10 +232,19 @@ async def profile_pic(ctx, *args):
     embed.set_image(url = (pfp))
 
     await ctx.send(embed = embed)
+	
+
+@bot.group()
+async def osu(ctx):
+    if ctx.invoked_subcommand is None:
+        help = '!osu link : osu! 계정을 discord 계정과 연결합니다.\n'
+        help += '!osu who : 해당 유저의 osu! 정보를 표시합니다.\n'
+        help += '!osu nr : 최신 랭크맵 목록을 보여줍니다.'
+        await ctx.send(help)
 
 
-@bot.command(pass_context = True , aliases=['osug'])
-async def get_osu(ctx, *args):
+@osu.command(name='who')
+async def who_osu(ctx, *args):
     userid = get_userid(args, ctx)
 
     if userid is None:
@@ -212,8 +266,8 @@ async def get_osu(ctx, *args):
     await ctx.send(embed = embed)
 
 
-@bot.command(pass_context = True , aliases=['osus'])
-async def set_osu_name(ctx, *args):
+@osu.command(name='link')
+async def link_osu(ctx, *args):
     if len(args) == 0:
         await ctx.send('osu! 닉네임이나 ID를 입력해주세요')
         return
@@ -252,7 +306,7 @@ async def set_osu_name(ctx, *args):
     await ctx.send('osu! 계정이 설정되었습니다. : ' + osu_name)
 
 
-@bot.command(name='nr')
+@osu.command(name='nr')
 async def new_ranked_map(ctx, hrs = None):
     sqlTimeFormat = '%Y-%m-%d %H:%M:%S'
     tz = timezone(timedelta(hours=0))
