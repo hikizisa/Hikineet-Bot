@@ -19,8 +19,6 @@ FORUMSID = os.getenv('FORUM_PM_SID')
 LOCALCHECK = os.getenv('LOCAL_USER_CHECK')
 
 def interrupt_handler(sig, frame):
-    print("\n")
-
     if (sqliteConnection):
         sqliteConnection.commit()
         sqliteConnection.close()
@@ -44,9 +42,20 @@ try:
 except sqlite3.Error as error:
     print("Error while connecting to sqlite", error)
     sys.exit(0)
+	
+def get_prefix(bot, message):
+    prefixes = ['!']
 
-bot = commands.Bot(command_prefix='!')
+    # Check to see if we are outside of a guild. e.g DM's etc.
+    if not message.guild:
+        # Only allow ? to be used in DMs
+        return '?'
 
+    # If we are in a guild, we allow for the user to mention us or use any of the prefixes in our list.
+    return commands.when_mentioned_or(*prefixes)(bot, message)
+
+bot = commands.Bot(command_prefix=get_prefix, description='HikiNeet bot for coding practice', case_insensitive=True)
+bot.add_cog(Osu(bot))
 
 def isInt(s):
     try: 
@@ -60,10 +69,14 @@ def isInt(s):
 async def on_ready():
     print(f'\nLogged in as: {bot.user.name} - {bot.user.id}\nVersion: {discord.__version__}\n')
     print(f'{bot.user} is connected to the following guild:\n')
+
     for guild in bot.guilds:
         print(
             f'{guild.name}(id: {guild.id})'
         )
+    activity=discord.Activity(type=discord.ActivityType.watching, name="cute Yue chan")
+
+    await bot.change_presence(activity=activity)
 
 
 '''
@@ -127,21 +140,22 @@ async def choose(ctx, *args):
 
 @bot.command(name='gacha')
 async def gacha(ctx, ren = 10):
-    limit = 25
+    limit = 50
 
-    if not (isInt(ren)):
-        ren = 10
     if ren > limit or ren < 1:
         await ctx.send(str(limit) + '연차 이내만 가능합니다.')
         return
 
+    pickup = []
     rainbow = []
     gold = []
     silver = []
 
-    prob_rainbow = 2.5
+    prob_pickup = 0.7
+    prob_rainbow = 1.8
     prob_gold = 18
 
+    pickup_emoji = '<:3pickup:665379328976224267>'
     rainbow_emoji = '<:3sung:665296979420512299>'
     silver_emoji = '<:sra:635880906242129970>'
     gold_emoji = '<:sra1:635881449853288449>'
@@ -153,6 +167,11 @@ async def gacha(ctx, ren = 10):
             result += '\n'
 
         value = random.random() * 100
+
+        value -= prob_pickup
+        if value < 0:
+            result += pickup_emoji
+            continue
 
         value -= prob_rainbow
         if value < 0:
