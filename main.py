@@ -18,6 +18,16 @@ DBPATH = os.getenv('DB_PATH')
 FORUMSID = os.getenv('FORUM_PM_SID')
 LOCALCHECK = os.getenv('LOCAL_USER_CHECK')
 
+gacha_colors = (0xc0c0c0, 0xffd700, 0xf0ffff)
+priconne_chars = [[], [], []]
+
+with open("priconne.txt", 'r', encoding="utf-8") as f:
+    for _, line in enumerate(f):
+        parsed = line.split(',')
+        if len(parsed) < 3:
+            continue
+        priconne_chars[int(parsed[2][0])-1].append([parsed[0], parsed[1]])
+
 def interrupt_handler(sig, frame):
     if (sqliteConnection):
         sqliteConnection.commit()
@@ -55,7 +65,7 @@ def get_prefix(bot, message):
     return commands.when_mentioned_or(*prefixes)(bot, message)
 
 bot = commands.Bot(command_prefix=get_prefix, description='HikiNeet bot for coding practice', case_insensitive=True)
-bot.add_cog(Osu(bot))
+#bot.add_cog(Osu(bot))
 
 def isInt(s):
     try: 
@@ -140,7 +150,7 @@ async def choose(ctx, *args):
 
 @bot.command(name='gacha')
 async def gacha(ctx, ren = 10):
-    limit = 50
+    limit = 10
 
     if ren > limit or ren < 1:
         await ctx.send(str(limit) + '연차 이내만 가능합니다.')
@@ -155,37 +165,37 @@ async def gacha(ctx, ren = 10):
     prob_rainbow = 1.8
     prob_gold = 18
 
-    pickup_emoji = '<:3pickup:665379328976224267>'
-    rainbow_emoji = '<:3sung:665296979420512299>'
-    silver_emoji = '<:sra:635880906242129970>'
-    gold_emoji = '<:sra1:635881449853288449>'
+    #pickup_emoji = '<:3pickup:665379328976224267>'
+    #rainbow_emoji = '<:3sung:665296979420512299>'
+    #silver_emoji = '<:sra:635880906242129970>'
+    #gold_emoji = '<:sra1:635881449853288449>'
 
-    result = ''
+    result = []
 
     for i in range(ren):
-        if i % 5 == 0:
-            result += '\n'
-
         value = random.random() * 100
 
         value -= prob_pickup
         if value < 0:
-            result += pickup_emoji
+            result.append(random.choice(priconne_chars[2]) + [2])
             continue
 
         value -= prob_rainbow
         if value < 0:
-            result += rainbow_emoji
+            result.append(random.choice(priconne_chars[2]) + [2])
             continue
 
         value -= prob_gold
         if value < 0 or i % 10 == 9:
-            result += gold_emoji
+            result.append(random.choice(priconne_chars[1]) + [1])
             continue
 
-        result += silver_emoji
-
-    await ctx.send(result)
+        result.append(random.choice(priconne_chars[0]) + [0])
+        
+    for char in result:
+        embed = discord.Embed(title=char[0] , color=gacha_colors[char[2]])
+        embed.set_image(url = char[1])
+        await ctx.send(embed = embed)
 
 
 '''
