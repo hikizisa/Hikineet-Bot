@@ -4,6 +4,7 @@ import random
 import os
 import requests
 from PIL import Image
+from io import BytesIO
 
 
 class Priconne(commands.Cog):
@@ -24,7 +25,7 @@ class Priconne(commands.Cog):
         gacha_colors = self.gacha_colors
         priconne_chars = self.priconne_chars
 
-        limit = 50
+        limit = 20
 
         if ren > limit or ren < 1:
             await ctx.send(str(limit) + '연차 이내만 가능합니다.')
@@ -73,20 +74,31 @@ class Priconne(commands.Cog):
         if not os.path.exists(priconne_img_dir):
             os.makedirs(priconne_img_dir)
             
-        for i, char in enumerate(result):
-            image = "./tmp/imgs/priconne/"+char[0]+".png"
-
-            if not os.path.exists(image):
-                response = requests.get(char[1])
-                print(response)
-                char_img = open(image, "wb")
-                char_img.write(response.content)
-                char_img.close()
+        if not os.path.exists("./tmp/imgs/priconne/icon_stars.png"):
+            response = requests.get("http://static.inven.co.kr/image_2011/priconne/dataninfo/icon_stars.png")
+            stars = Image.open(BytesIO(response.content))
+            stars.save("./tmp/imgs/priconne/icon_stars.png")
             
-            res_images.append(Image.open(image))
-            res_str += char[0] + "(" + str(char[2] + 1) + "성) "
+        for i, char in enumerate(result):
+            image_path = "./tmp/imgs/priconne/"+char[0]+".png"
+
+            if not os.path.exists(image_path):
+                response = requests.get(char[1])
+                
+                chara = Image.open(BytesIO(response.content))
+                star = Image.open("./tmp/imgs/priconne/icon_stars.png")
+                w, h = star.size
+                
+                chara_star = star.crop((0, (char[2]+1) * h // 6, w, (char[2]+2) * h))
+                chara.paste(chara_star, (0, chara.size[1] - h // 6))
+                chara.save(image_path)
+            
+            res_images.append(Image.open(image_path))
+            res_str += char[0]
             if i % 5 == 4:
                 res_str += "\n"
+            else:
+                res_str += ", "
 
         widths, heights = zip(*(i.size for i in res_images))
         total_width = widths[0] * (5 if ren >= 5 else ren)
