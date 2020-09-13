@@ -1,6 +1,9 @@
 import discord
 from discord.ext import commands
 import random
+import os
+import requests
+from PIL import Image
 
 
 class Priconne(commands.Cog):
@@ -21,7 +24,7 @@ class Priconne(commands.Cog):
         gacha_colors = self.gacha_colors
         priconne_chars = self.priconne_chars
 
-        limit = 10
+        limit = 50
 
         if ren > limit or ren < 1:
             await ctx.send(str(limit) + '연차 이내만 가능합니다.')
@@ -63,7 +66,44 @@ class Priconne(commands.Cog):
 
             result.append(random.choice(priconne_chars[0]) + [0])
             
-        for char in result:
-            embed = discord.Embed(title=char[0] , color=gacha_colors[char[2]])
-            embed.set_image(url = char[1])
-            await ctx.send(embed = embed)
+        res_str = ''
+        res_images = []
+        priconne_img_dir = "./tmp/imgs/priconne/"
+        
+        if not os.path.exists(priconne_img_dir):
+            os.makedirs(priconne_img_dir)
+            
+        for i, char in enumerate(result):
+            image = "./tmp/imgs/priconne/"+char[0]+".png"
+
+            if not os.path.exists(image):
+                response = requests.get(char[1])
+                print(response)
+                char_img = open(image, "wb")
+                char_img.write(response.content)
+                char_img.close()
+            
+            res_images.append(Image.open(image))
+            res_str += char[0] + "(" + str(char[2] + 1) + "성) "
+            if i % 5 == 4:
+                res_str += "\n"
+
+        widths, heights = zip(*(i.size for i in res_images))
+        total_width = widths[0] * (5 if ren >= 5 else ren)
+        total_height = heights[0] * ((ren-1) // 5 + 1)
+        
+        gacha_result = Image.new('RGB', (total_width, total_height))
+        
+        for i, img in enumerate(res_images):
+            gacha_result.paste(img, (i % 5 * widths[0], i // 5 * widths[0]))
+        
+        res_image_path = "./tmp/imgs/priconne/result.jpg"
+        gacha_result.save(res_image_path)
+        
+        image = open(res_image_path, 'rb')
+        await ctx.send(file=discord.File(fp=image, filename="result.jpg"), content=res_str)
+        image.close()
+        
+        os.remove(res_image_path)
+            
+            

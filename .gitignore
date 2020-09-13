@@ -1,5 +1,5 @@
 .env
-SQLite_Python.db
-SQLite_Python.db-journal
 onee_chan.db
 __pycache__/
+onee_chan.db-journal
+/tmp
