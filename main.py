@@ -14,6 +14,7 @@ HOST = os.getenv('HOST')
 
 from commands.priconne import Priconne
 from commands.osu import Osu
+from commands.omq import Omq
 
 
 try:
@@ -193,4 +194,5 @@ async def profile_pic(ctx, *args):
 
 bot.add_cog(Priconne(bot))
 bot.add_cog(Osu(bot, cursor))
+bot.add_cog(Omq(bot, cursor))
 bot.run(TOKEN)

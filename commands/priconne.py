@@ -77,6 +77,7 @@ class Priconne(commands.Cog):
         if not os.path.exists("./tmp/imgs/priconne/icon_stars.png"):
             response = requests.get("http://static.inven.co.kr/image_2011/priconne/dataninfo/icon_stars.png")
             stars = Image.open(BytesIO(response.content))
+            stars = stars.resize((int(stars.size[0]*1.5), int(stars.size[1]*1.5)))
             stars.save("./tmp/imgs/priconne/icon_stars.png")
             
         for i, char in enumerate(result):
@@ -90,7 +91,7 @@ class Priconne(commands.Cog):
                 w, h = star.size
                 
                 chara_star = star.crop((0, (char[2]+1) * h // 6, w, (char[2]+2) * h))
-                chara.paste(chara_star, (0, chara.size[1] - h // 6))
+                chara.paste(chara_star, (0, chara.size[1] - h // 6), mask=chara_star)
                 chara.save(image_path)
             
             res_images.append(Image.open(image_path))

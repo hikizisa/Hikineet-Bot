@@ -43,15 +43,43 @@ def init_osu_verification(cursor):
 
     for query in queries:
         execute_and_log(cursor, query)
+        
+def init_osu_song_quiz(cursor):
+    queries = []
+    queries.append("DROP TABLE IF EXISTS OsuQuiz;")
+    queries.append("CREATE TABLE IF NOT EXISTS OsuQuiz (server_id INT, mapset_id INT, song_name STRING);")
+    queries.append("DROP TABLE IF EXISTS OsuQuizSettings;")
+    queries.append("CREATE TABLE IF NOT EXISTS OsuQuizSettings (server_id INT, length INT DEFAULT 1000, timeout INT DEFAULT 60);")
+    
+    for query in queries:
+        execute_and_log(cursor, query)
 
 try:
     sqliteConnection = sqlite3.connect(DBPATH)
     cursor = sqliteConnection.cursor()
-    print("Database created and Successfully Connected to SQLite")
-	
-    init_last_update(cursor)
-    init_osu_id_connection(cursor)
-    init_osu_verification(cursor)
+    print("Database is created and Successfully Connected to SQLite")
+    
+    options = ["last_update", "osu_id_connection", "osu_verification", "osu_song_quiz"]
+    func = [init_last_update, init_osu_id_connection, init_osu_verification, init_osu_song_quiz]
+    
+    choice = None
+    print("Choose database you want to reset, -1 to reset everything.")
+    print("==")
+    for i, option in enumerate(options):
+        print(i, ": ", option)
+    print("==")
+
+    while choice is None:
+        try:
+            choice = int(input())
+        except:
+            continue
+    
+    if 0 <= choice < len(func):
+        func[choice](cursor)
+    else:
+        for i in range(len(func)):
+            func[i](cursor)
 
     cursor.close()
 
