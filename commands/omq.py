@@ -1,6 +1,7 @@
 import os
 import discord
 from discord.ext import commands
+import time as timer
 from datetime import date, datetime, time, timedelta, timezone
 import urllib.parse
 import requests
@@ -31,6 +32,7 @@ class Omq(commands.Cog):
             help = '!omq add (mapsetID) [songName] : 퀴즈 대상 곡을 추가합니다.\n'
             help += '!omq length (sec) : 재생할 프리뷰의 길이를 지정합니다.\n'
             help += '!omq timeout [sec] : 정답을 받을 시간을 지정합니다. 시간을 지정하지 않으면 무제한이 됩니다.\n'
+            help += '!omq setting : 현재 서버의 세팅을 확인합니다.\n'
             help += '!omq play : 퀴즈를 플레이합니다.\n'
             help += '!omq answer (songName) : 퀴즈의 답변을 제시합니다. 대소문자와 띄어쓰기는 무시합니다.\n'
             help += '!omq list : 퀴즈 대상 곡의 목록을 보여줍니다.\n'
@@ -120,18 +122,18 @@ class Omq(commands.Cog):
             cursor.execute(updateQuery, (timeout, guild_id))
         await ctx.send("제한 시간을 " + str(timeout) + "초로 설정했습니다!")
         
-    def game_over(self, round_id):
+    async def game_over(self, round_id):
         cursor = self.cursor
         checkQuery = "SELECT * from OmqRound where round_id = ?;"
         cursor.execute(checkQuery, (round_id,))
         record = cursor.fetchall()
         
-        if len(record) > 0:
+        if len(record) == 0:
             return
             
-        channel = client.get_channel(record[0][0])
-        bot.loop.create_task(channel.send("시간이 초과되었습니다."))
-        bot.loop.create_task(channel.send("정답은 " + answer + "입니다!"))
+        channel = self.bot.get_channel(record[0][0])
+        await channel.send("시간이 초과되었습니다.")
+        await channel.send("정답은 " + record[0][2] + "입니다!")
         
         # remove quiz from database
         removeQuery = "DELETE from OmqRound where round_id = ?;"
@@ -150,14 +152,16 @@ class Omq(commands.Cog):
             return
         
         # Retrieve quiz settings and songs in the server
-        guild = ctx.guild.id
+        guild_id = ctx.guild.id
         selectQuery = "SELECT * from OsuQuiz where server_id = ? ORDER BY RANDOM() LIMIT 1;"
-        cursor.execute(selectQuery, (guild,))
+        cursor.execute(selectQuery, (guild_id,))
         record = cursor.fetchall()
         
         if len(record) == 0:
             await ctx.send("등록된 곡이 없습니다!")
             return
+
+        answer = record[0][2]
         
         # Check server settings
         checkQuery = "SELECT * from OsuQuizSettings where server_id = ?;"
@@ -175,7 +179,7 @@ class Omq(commands.Cog):
         omq_song_cut = "./tmp/audios/omq/" + str(record[0][1]) + 'cut.mp3'
         
         sound = AudioSegment.from_mp3(omq_song)
-        if len(sound) > settings:
+        if len(sound) > length:
             sound = sound[:length]
         sound.export(omq_song_cut, format="mp3")
         
@@ -185,14 +189,11 @@ class Omq(commands.Cog):
         await ctx.send(file=discord.File(fp=mp3, filename="quiz.mp3"))
         
         # Add round to database
-        answer = record[0][2]
         quiz_round_query = "INSERT INTO OmqRound VALUES(?, ?, ?);"
         record = cursor.execute(quiz_round_query, (ctx.channel.id, self.round_id, answer))
         
-        
-        t = Timer(length, self.game_over, [self.round_id])
-        t.start()
-        
+        timer.sleep(timeout)
+        await self.game_over(self.round_id)
         
     @omq.command(name='answer')
     async def answer(self, ctx, *args):
@@ -221,6 +222,23 @@ class Omq(commands.Cog):
             removeQuery = "DELETE from OmqRound where channel_id = ?;"
             cursor.execute(removeQuery, (ctx.channel.id,))
         
+    @omq.command(name='setting')
+    async def settings(self, ctx, *args):
+        cursor = self.cursor
+        
+        guild_id = ctx.guild.id
+        
+        checkQuery = "SELECT * from OsuQuizSettings where server_id = ?;"
+        cursor.execute(checkQuery, (guild_id,))
+        record = cursor.fetchall()
+        
+        timeout = 60
+        length = 1000
+        if len(record) > 0:
+            length = record[0][1]
+            timeout =  record[0][2]
+            
+        await ctx.send("현재 서버에서 프리뷰 길이는 " + str(length) + "ms이며 " + "제한 시간은 " + str(timeout) + "초입니다.")
         
     @omq.command(name='list')
     async def list(self, ctx, *args):
