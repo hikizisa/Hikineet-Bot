@@ -202,9 +202,11 @@ class Omq(commands.Cog):
         cursor = self.cursor
         
         # retrieve quiz from database
-        selectQuery = "SELECT * from OmqRound where round_id = ?;"
-        cursor.execute(selectQuery, (round_id,))
+        selectQuery = "SELECT * from OmqRound where channel_id = ?;"
+        cursor.execute(selectQuery, (ctx.channel.id,))
         record = cursor.fetchall()
+        
+        round_id = record[0][1]
         
         rowcount = 0
         if len(record) > 0:
