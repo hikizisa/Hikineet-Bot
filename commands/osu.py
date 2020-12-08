@@ -64,9 +64,9 @@ class Osu(commands.Cog):
     @commands.group()
     async def osu(self, ctx):
         if ctx.invoked_subcommand is None:
-            help = '!osu link : osu! 계정을 discord 계정과 연결합니다.\n'
-            help += '!osu who : 해당 유저의 osu! 정보를 표시합니다.\n'
-            help += '!osu nr : 최신 랭크맵 목록을 보여줍니다.'
+            help = 'osu link : osu! 계정을 discord 계정과 연결합니다.\n'
+            help += 'osu who : 해당 유저의 osu! 정보를 표시합니다.\n'
+            help += 'osu nr : 최신 랭크맵 목록을 보여줍니다.'
             await ctx.send(help)
 
 

@@ -14,8 +14,7 @@ HOST = os.getenv('HOST')
 
 from commands.priconne import Priconne
 from commands.osu import Osu
-from commands.omq import Omq
-
+from commands.omq import Omq, answer
 
 try:
     sqliteConnection = sqlite3.connect(DBPATH)
@@ -117,6 +116,7 @@ async def on_message(message):
         response = '<:8_:625386426447429643><:7_:625386445372260353>'
         await message.channel.send(response)
 
+    await answer(message, cursor)
     await bot.process_commands(message)
 
 
