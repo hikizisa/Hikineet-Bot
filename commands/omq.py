@@ -12,6 +12,7 @@ from io import BytesIO
 from pydub import AudioSegment
 from threading import Timer
 
+
 class Omq(commands.Cog):
     def __init__(self, bot, cursor):
         self.bot = bot
@@ -30,6 +31,7 @@ class Omq(commands.Cog):
         for query in queries:
             cursor.execute(query)
 
+
     @commands.group()
     async def omq(self, ctx):
         if ctx.invoked_subcommand is None:
@@ -45,6 +47,7 @@ class Omq(commands.Cog):
             help += "omq terminate : 퀴즈를 강제로 종료합니다."
             await ctx.send(help)
             
+            
     async def download_song(self, song_id):
         omq_song_dir = "./tmp/audios/omq/"
         if os.path.isfile(omq_song_dir + str(song_id) + '.mp3'):
@@ -52,36 +55,42 @@ class Omq(commands.Cog):
         mp3 = requests.get('https://b.ppy.sh/preview/' + str(song_id) + '.mp3')
         with open(omq_song_dir + str(song_id) + '.mp3', 'wb') as f:
             f.write(mp3.content)
+            
+            
+    async def add_song_db(self, separated_line, guild):
+        if len(separated_line) == 1:
+            #find song title from API request
+            return
+            
+        cursor = self.cursor
+        
+        song_id = separated_line[0]
+        try:
+            song_id = int(song_id)
+        except:
+            return
+            
+        song_name = ' '.join(separated_line[1:])
+        await self.download_song(song_id)
+        
+        print(guild, song_id, song_name)
+
+        insertQuery = "INSERT into OsuQuiz (server_id, mapset_id, song_name) VALUES (?, ?, ?);"
+        cursor.execute(insertQuery, (guild, song_id, song_name))
+
 
     @omq.command(name='add')
     async def add_song(self, ctx, *args):
-        cursor = self.cursor
-        
         guild = ctx.guild.id
         if len(args) < 2:
             await self.add_db(ctx, guild, args[0])
             return
             
-        song_id = args[0]
-        
-        try:
-            song_id = int(song_id)
-        except:
-            await ctx.send("맵셋 ID는 정수로 입력해주세요.")
-            return
-                
-        song_name = ' '.join(args[1:])
-        
-        await self.download_song(song_id)
-
-        insertQuery = "INSERT into OsuQuiz (server_id, mapset_id, song_name) VALUES (?, ?, ?);"
-        cursor.execute(insertQuery, (guild, song_id, song_name))
-        record = cursor.fetchall()
-
+        await self.add_song_db(args, guild)
         await ctx.send(str(song_id) + " - " + song_name + "가 추가되었습니다.")
     
+    
     async def add_db(self, ctx, guild, url):
-        cursor = self.cursor
         data = None
         try:
             headers = {"User-Agent" : "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.11 (KHTML, like Gecko) Chrome/23.0.1271.95 Safari/537.11"}
@@ -96,28 +105,13 @@ class Omq(commands.Cog):
             return
 
         for line in data:
-            line = line.decode("utf-8")
-            line.replace("\t", "")
-            line = line.rstrip()
+            line = line.decode("utf-8").replace("\t", "").rstrip()
             space = line.split(" ")
             
-            if len(space) == 1:
-                #find song title from API request
-                pass
-            
-            song_id = space[0]
-            try:
-                song_id = int(song_id)
-            except:
-                continue
-                
-            song_name = ' '.join(space[1:])
-            await self.download_song(song_id)
-            
-            print(guild, song_id, song_name)
-
-            insertQuery = "INSERT into OsuQuiz (server_id, mapset_id, song_name) VALUES (?, ?, ?);"
-            cursor.execute(insertQuery, (guild, song_id, song_name))
+            await self.add_song_db(space, guild)
+        
+        await ctx.send("곡 목록을 등록했습니다!")
+        
         
     @omq.command(name='length')
     async def set_length(self, ctx, *args):
@@ -148,6 +142,7 @@ class Omq(commands.Cog):
             cursor.execute(updateQuery, (length, guild_id))
         await ctx.send("프리뷰 길이를 " + str(length) + "초로 설정했습니다!")
         
+        
     @omq.command(name='timeout')
     async def set_timeout(self, ctx, *args):
         cursor = self.cursor
@@ -177,6 +172,7 @@ class Omq(commands.Cog):
             cursor.execute(updateQuery, (timeout, guild_id))
         await ctx.send("제한 시간을 " + str(timeout) + "초로 설정했습니다!")
         
+        
     async def game_over(self, round_id, timeout):
         await asyncio.sleep(timeout)
         cursor = self.cursor
@@ -196,6 +192,7 @@ class Omq(commands.Cog):
             channel = self.bot.get_channel(record[0][0])
             await channel.send("시간이 초과되었습니다.")
             await channel.send("정답은 " + record[0][2] + "입니다!")
+
 
     @omq.command(name='terminate')
     async def terminate(self, ctx, *args):
@@ -218,6 +215,7 @@ class Omq(commands.Cog):
             channel = self.bot.get_channel(record[0][0])
             await ctx.send("라운드가 취소되었습니다!")
             await channel.send("정답은 " + record[0][2] + "입니다!")
+
 
     @omq.command(name='play')
     async def play(self, ctx, *args):
@@ -263,17 +261,21 @@ class Omq(commands.Cog):
             sound = sound[:length]
         sound.export(omq_song_cut, format="mp3")
         
+        if answer.replace(" ", "") == "":
+            return
+        
         # Send messages
         await ctx.send("곡 제목을 맞춰주세요!")
         mp3 = open(omq_song_cut, 'rb')
         await ctx.send(file=discord.File(fp=mp3, filename="quiz.mp3"))
-        await ctx.send(''.join(c if not c.isalpha() else '^' for c in answer))
+        await ctx.send("`" + ''.join(c if not (c.isalpha() or c.isnumeric()) else '#' for c in answer) + "`")
         
         # Add round to database
         quiz_round_query = "INSERT INTO OmqRound VALUES(?, ?, ?);"
         record = cursor.execute(quiz_round_query, (ctx.channel.id, self.round_id, answer))
         
         await self.game_over(self.round_id, timeout)
+        
         
     @omq.command(name='setting')
     async def settings(self, ctx, *args):
@@ -292,6 +294,7 @@ class Omq(commands.Cog):
             timeout =  record[0][2]
             
         await ctx.send("현재 서버에서 프리뷰 길이는 " + str(length) + "ms이며 " + "제한 시간은 " + str(timeout) + "초입니다.")
+        
         
     @omq.command(name='list')
     async def list(self, ctx, *args):
@@ -337,6 +340,7 @@ class Omq(commands.Cog):
         
         await ctx.send(msg)
 
+
     @omq.command(name='remove')
     async def remove_song(self, ctx, *args):
         cursor = self.cursor
@@ -370,6 +374,7 @@ class Omq(commands.Cog):
         record = cursor.fetchall()
         
         await ctx.send("서버의 지정곡 목록을 초기화 했습니다!")
+       
        
 async def answer(message, cursor):
     channel = message.channel
