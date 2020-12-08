@@ -35,7 +35,7 @@ class Omq(commands.Cog):
     @commands.group()
     async def omq(self, ctx):
         if ctx.invoked_subcommand is None:
-            help = "omq add (mapsetID) [songName] : 퀴즈 대상 곡을 추가합니다.\n"
+            help = "`omq add (mapsetID) [songName] : 퀴즈 대상 곡을 추가합니다.\n"
             help += "omq length (ms) : 재생할 프리뷰의 길이를 지정합니다.\n"
             help += "omq timeout [sec] : 정답을 받을 시간을 지정합니다. 시간을 지정하지 않으면 무제한이 됩니다.\n"
             help += "omq setting : 현재 서버의 세팅을 확인합니다.\n"
@@ -44,17 +44,16 @@ class Omq(commands.Cog):
             help += "omq list [offset] [limit] : 퀴즈 대상 곡의 목록을 보여줍니다.\n"
             help += "omq remove (mapsetID) : 지정한 곡을 퀴즈 목록에서 제거합니다.\n"
             help += "omq reset : 서버에 지정 곡 목록을 초기화 합니다.\n"
-            help += "omq terminate : 퀴즈를 강제로 종료합니다."
+            help += "omq pass : 퀴즈를 강제로 종료합니다.`"
             await ctx.send(help)
             
             
     async def download_song(self, song_id):
         omq_song_dir = "./tmp/audios/omq/"
-        if os.path.isfile(omq_song_dir + str(song_id) + '.mp3'):
-            return
-        mp3 = requests.get('https://b.ppy.sh/preview/' + str(song_id) + '.mp3')
-        with open(omq_song_dir + str(song_id) + '.mp3', 'wb') as f:
-            f.write(mp3.content)
+        if not os.path.isfile(omq_song_dir + str(song_id) + '.mp3'):
+            mp3 = requests.get('https://b.ppy.sh/preview/' + str(song_id) + '.mp3')
+            with open(omq_song_dir + str(song_id) + '.mp3', 'wb') as f:
+                f.write(mp3.content)
             
             
     async def add_song_db(self, separated_line, guild):
@@ -87,7 +86,7 @@ class Omq(commands.Cog):
             return
             
         await self.add_song_db(args, guild)
-        await ctx.send(str(song_id) + " - " + song_name + "가 추가되었습니다.")
+        await ctx.send(str(args[0]) + " - " + ' '.join(args[1:]) + "가 추가되었습니다.")
     
     
     async def add_db(self, ctx, guild, url):
@@ -194,7 +193,7 @@ class Omq(commands.Cog):
             await channel.send("정답은 " + record[0][2] + "입니다!")
 
 
-    @omq.command(name='terminate')
+    @omq.command(name='pass')
     async def terminate(self, ctx, *args):
         cursor = self.cursor
         
@@ -203,6 +202,10 @@ class Omq(commands.Cog):
         cursor.execute(selectQuery, (ctx.channel.id,))
         record = cursor.fetchall()
         
+        if len(record) == 0:
+            await ctx.send("진행 중인 라운드가 없습니다.")
+            return
+
         round_id = record[0][1]
         
         rowcount = 0
@@ -256,7 +259,13 @@ class Omq(commands.Cog):
         omq_song = "./tmp/audios/omq/" + str(record[0][1]) + '.mp3'
         omq_song_cut = "./tmp/audios/omq/" + str(record[0][1]) + 'cut.mp3'
         
-        sound = AudioSegment.from_mp3(omq_song)
+        sound = None
+        try:
+            sound = AudioSegment.from_mp3(omq_song)
+        except:
+            await ctx.send("출제 중 오류가 발생했습니다! 다시 시도해주세요.")
+            return
+            
         if len(sound) > length:
             sound = sound[:length]
         sound.export(omq_song_cut, format="mp3")
@@ -268,6 +277,7 @@ class Omq(commands.Cog):
         await ctx.send("곡 제목을 맞춰주세요!")
         mp3 = open(omq_song_cut, 'rb')
         await ctx.send(file=discord.File(fp=mp3, filename="quiz.mp3"))
+        mp3.close()
         await ctx.send("`" + ''.join(c if not (c.isalpha() or c.isnumeric()) else '#' for c in answer) + "`")
         
         # Add round to database
@@ -339,6 +349,34 @@ class Omq(commands.Cog):
             msg += str(i + offset) + ": " + str(song[1]) + " - " + song[2] + "\n"
         
         await ctx.send(msg)
+        
+        
+    @omq.command(name='export')
+    async def export_list(self, ctx, *args):
+        cursor = self.cursor
+
+        guild_id = ctx.guild.id
+        selectQuery = "SELECT * from OsuQuiz where server_id = ?;"
+        cursor.execute(selectQuery, (guild_id,))
+        record = cursor.fetchall()
+
+        msg = ""
+        if len(record) == 0:
+            await ctx.send("등록된 곡이 없습니다!")
+            return
+        for i, song in enumerate(record):
+            msg += str(song[1]) + " " + song[2] + "\n"
+        
+        try:
+            file = open("./tmp/texts/omq/backup.txt", "w")
+            n = file.write(msg)
+            file.close()
+        except:
+            await ctx.send("목록 내보내기에 실패했습니다!")
+
+        txt = open("./tmp/texts/omq/backup.txt", 'rb')
+        await ctx.send(file=discord.File(fp=txt, filename="songlist.txt"))
+        txt.close()
 
 
     @omq.command(name='remove')

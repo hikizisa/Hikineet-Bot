@@ -117,6 +117,9 @@ class Priconne(commands.Cog):
         await ctx.send(file=discord.File(fp=image, filename="result.jpg"), content=res_str)
         image.close()
         
-        os.remove(res_image_path)
+        try:
+            os.remove(res_image_path)
+        except:
+            pass
             
             
