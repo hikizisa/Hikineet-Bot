@@ -23,6 +23,10 @@ class Omq(commands.Cog):
         omq_song_dir = "./tmp/audios/omq/"
         if not os.path.exists(omq_song_dir):
             os.makedirs(omq_song_dir)
+            
+        omq_txt_dir = "./tmp/texts/omq"
+        if not os.path.exists(omq_txt_dir):
+            os.makedirs(omq_txt_dir)
         
         queries = []
         queries.append("DROP TABLE IF EXISTS OmqRound;")
@@ -368,11 +372,12 @@ class Omq(commands.Cog):
             msg += str(song[1]) + " " + song[2] + "\n"
         
         try:
-            file = open("./tmp/texts/omq/backup.txt", "w")
+            file = open("./tmp/texts/omq/backup.txt", "w+")
             n = file.write(msg)
             file.close()
         except:
             await ctx.send("목록 내보내기에 실패했습니다!")
+            return
 
         txt = open("./tmp/texts/omq/backup.txt", 'rb')
         await ctx.send(file=discord.File(fp=txt, filename="songlist.txt"))
@@ -435,4 +440,4 @@ async def answer(message, cursor):
         
         rowcount = cursor.rowcount
         if rowcount  > 0:
-            await channel.send("정답입니다, " + message.author.name + "님!")
+            await channel.send("정답입니다, " + message.author.display_name + "님!")

@@ -117,7 +117,10 @@ async def on_message(message):
         await message.channel.send(response)
 
     await answer(message, cursor)
-    await bot.process_commands(message)
+    try:
+        await bot.process_commands(message)
+    except:
+        pass
 
 
 @bot.command(name='roll')
