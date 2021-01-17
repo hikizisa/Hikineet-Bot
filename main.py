@@ -45,6 +45,7 @@ def get_prefix(bot, message):
 
 bot = commands.Bot(command_prefix=get_prefix, description='HikiNeet bot for coding practice', case_insensitive=True)
 #bot.add_cog(Osu(bot))
+omqcog = Omq(bot, cursor)
 
 
 def shutdown_bot():
@@ -54,7 +55,7 @@ def shutdown_bot():
         print("The SQLite connection is closed")
 
     print("Shutting down bot")
-    sys.exit(0)
+    os._exit(0)
     
 
 @bot.command(name='shutdown')
@@ -101,6 +102,7 @@ async def on_member_join(member):
 
 @bot.event
 async def on_message(message):
+    ctx = await bot.get_context(message)
     if message.author == bot.user:
         return
 
@@ -116,7 +118,7 @@ async def on_message(message):
         response = '<:8_:625386426447429643><:7_:625386445372260353>'
         await message.channel.send(response)
 
-    await answer(message, cursor)
+    await answer(message, cursor, omqcog, ctx)
     try:
         await bot.process_commands(message)
     except:
@@ -197,5 +199,5 @@ async def profile_pic(ctx, *args):
 
 bot.add_cog(Priconne(bot))
 bot.add_cog(Osu(bot, cursor))
-bot.add_cog(Omq(bot, cursor))
+bot.add_cog(omqcog)
 bot.run(TOKEN)

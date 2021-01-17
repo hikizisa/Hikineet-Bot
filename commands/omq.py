@@ -1,3 +1,7 @@
+# game_over / pass -> one function
+# sql to separate function
+# play command : retry on error
+
 import os
 import discord
 from discord.ext import commands
@@ -16,9 +20,9 @@ from threading import Timer
 class Omq(commands.Cog):
     def __init__(self, bot, cursor):
         self.bot = bot
+        self.round_id = 0
         
         self.cursor = cursor
-        self.round_id = 0
         
         omq_song_dir = "./tmp/audios/omq/"
         if not os.path.exists(omq_song_dir):
@@ -29,8 +33,12 @@ class Omq(commands.Cog):
             os.makedirs(omq_txt_dir)
         
         queries = []
+        queries.append("DROP TABLE IF EXISTS OmqRoundAnswer;")
+        queries.append("CREATE TABLE IF NOT EXISTS OmqRoundAnswer (channel_id INT, round_id INT, song_name STRING);")
+        queries.append("DROP TABLE IF EXISTS OmqRoundScore;")
+        queries.append("CREATE TABLE IF NOT EXISTS OmqRoundScore (channel_id INT, user_id STRING, score INT);")
         queries.append("DROP TABLE IF EXISTS OmqRound;")
-        queries.append("CREATE TABLE IF NOT EXISTS OmqRound (channel_id INT, round_id INT, song_name STRING);")
+        queries.append("CREATE TABLE IF NOT EXISTS OmqRound (channel_id INT);")
     
         for query in queries:
             cursor.execute(query)
@@ -48,7 +56,9 @@ class Omq(commands.Cog):
             help += "omq list [offset] [limit] : 퀴즈 대상 곡의 목록을 보여줍니다.\n"
             help += "omq remove (mapsetID) : 지정한 곡을 퀴즈 목록에서 제거합니다.\n"
             help += "omq reset : 서버에 지정 곡 목록을 초기화 합니다.\n"
-            help += "omq pass : 퀴즈를 강제로 종료합니다.`"
+            help += "omq pass : 퀴즈를 강제로 종료합니다.\n"
+            help += "omq stop : 라운드를 종료합니다."
+            help += "`"
             await ctx.send(help)
             
             
@@ -145,6 +155,24 @@ class Omq(commands.Cog):
             cursor.execute(updateQuery, (length, guild_id))
         await ctx.send("프리뷰 길이를 " + str(length) + "초로 설정했습니다!")
         
+    
+    @omq.command(name='stop')
+    async def stop(self, ctx, *args):
+        cursor = self.cursor
+
+        # retrieve quiz from database
+        selectQuery = "SELECT * from OmqRoundAnswer where channel_id = ?;"
+        cursor.execute(selectQuery, (ctx.channel.id,))
+        record = cursor.fetchall()
+        
+        if len(record) == 0:
+            await ctx.send("진행 중인 라운드가 없습니다.")
+            return
+        else:
+            selectQuery = "DELETE from OmqRoundAnswer where channel_id = ?;"
+            cursor.execute(selectQuery, (ctx.channel.id,))
+            await ctx.send("라운드가 종료되었습니다!")
+        
         
     @omq.command(name='timeout')
     async def set_timeout(self, ctx, *args):
@@ -176,64 +204,64 @@ class Omq(commands.Cog):
         await ctx.send("제한 시간을 " + str(timeout) + "초로 설정했습니다!")
         
         
-    async def game_over(self, round_id, timeout):
+    async def game_over(self, ctx, timeout, round_id = None):
         await asyncio.sleep(timeout)
         cursor = self.cursor
+        channel_id = ctx.channel.id
         
         # retrieve quiz from database
-        selectQuery = "SELECT * from OmqRound where round_id = ?;"
-        cursor.execute(selectQuery, (round_id,))
-        record = cursor.fetchall()
-        
-        rowcount = 0
-        if len(record) > 0:
-            selectQuery = "DELETE from OmqRound where round_id = ?;"
+        selectQuery = None
+        if round_id is None:
+            selectQuery = "SELECT * from OmqRoundAnswer where channel_id = ?;"
+            cursor.execute(selectQuery, (channel_id,))
+        else:
+            selectQuery = "SELECT * from OmqRoundAnswer where round_id = ?;"
             cursor.execute(selectQuery, (round_id,))
-            rowcount = cursor.rowcount
-        
-        if rowcount  > 0:
-            channel = self.bot.get_channel(record[0][0])
-            await channel.send("시간이 초과되었습니다.")
-            await channel.send("정답은 " + record[0][2] + "입니다!")
 
-
-    @omq.command(name='pass')
-    async def terminate(self, ctx, *args):
-        cursor = self.cursor
-        
-        # retrieve quiz from database
-        selectQuery = "SELECT * from OmqRound where channel_id = ?;"
-        cursor.execute(selectQuery, (ctx.channel.id,))
         record = cursor.fetchall()
         
         if len(record) == 0:
-            await ctx.send("진행 중인 라운드가 없습니다.")
+            if round_id is None:
+                await ctx.send("진행 중인 라운드가 없습니다.")
             return
-
-        round_id = record[0][1]
         
         rowcount = 0
         if len(record) > 0:
-            selectQuery = "DELETE from OmqRound where round_id = ?;"
-            cursor.execute(selectQuery, (round_id,))
-            rowcount = cursor.rowcount
+            if round_id is None:
+                selectQuery = "DELETE from OmqRoundAnswer where channel_id = ?;"
+                cursor.execute(selectQuery, (channel_id,))
+                rowcount = cursor.rowcount
+            else:
+                selectQuery = "DELETE from OmqRoundAnswer where round_id = ?;"
+                cursor.execute(selectQuery, (round_id,))
+                rowcount = cursor.rowcount
         
-        if rowcount  > 0:
+        if rowcount > 0:
             channel = self.bot.get_channel(record[0][0])
-            await ctx.send("라운드가 취소되었습니다!")
-            await channel.send("정답은 " + record[0][2] + "입니다!")
+            if round_id is None:
+                await ctx.send("라운드가 취소되었습니다!")
+            else:
+                await channel.send("시간이 초과되었습니다.")
+            await channel.send("정답은 `" + record[0][1] + "`입니다!")
+            
+            await self.play(ctx, True)
+
+
+    @omq.command(name='pass')
+    async def pass_round(self, ctx, *args):
+        await self.game_over(ctx, 0)
 
 
     @omq.command(name='play')
-    async def play(self, ctx, *args):
-        self.round_id += 1
+    async def play(self, ctx, auto = False, *args):
         cursor = self.cursor
         
-        checkQuery = "SELECT * from OmqRound where channel_id = ?;"
+        checkQuery = "SELECT * from OmqRoundAnswer where channel_id = ?;"
         cursor.execute(checkQuery, (ctx.channel.id,))
         record = cursor.fetchall()
         if len(record) > 0:
-            await ctx.send("이미 라운드가 진행중입니다!")
+            if not auto:
+                await ctx.send("이미 라운드가 진행중입니다!")
             return
         
         # Retrieve quiz settings and songs in the server
@@ -277,18 +305,20 @@ class Omq(commands.Cog):
         if answer.replace(" ", "") == "":
             return
         
-        # Send messages
-        await ctx.send("곡 제목을 맞춰주세요!")
-        mp3 = open(omq_song_cut, 'rb')
-        await ctx.send(file=discord.File(fp=mp3, filename="quiz.mp3"))
-        mp3.close()
-        await ctx.send("`" + ''.join(c if not (c.isalpha() or c.isnumeric()) else '#' for c in answer) + "`")
-        
         # Add round to database
-        quiz_round_query = "INSERT INTO OmqRound VALUES(?, ?, ?);"
-        record = cursor.execute(quiz_round_query, (ctx.channel.id, self.round_id, answer))
+        quiz_round_query = "INSERT INTO OmqRoundAnswer SELECT ?, ?, ? WHERE NOT EXISTS(SELECT 1 FROM OmqRoundAnswer where channel_id = ?);"
+        record = cursor.execute(quiz_round_query, (ctx.channel.id, answer, self.round_id, ctx.channel.id))
+        self.round_id += 1
         
-        await self.game_over(self.round_id, timeout)
+        if cursor.rowcount >= 1:
+            # Send messages
+            await ctx.send("곡 제목을 맞춰주세요!")
+            mp3 = open(omq_song_cut, 'rb') 
+            await ctx.send(file=discord.File(fp=mp3, filename="quiz.mp3"))
+            mp3.close()
+            await ctx.send("`" + ''.join(c if not (c.isalpha() or c.isnumeric()) else '#' for c in answer) + "`")
+            
+            await self.game_over(ctx, timeout, self.round_id)
         
         
     @omq.command(name='setting')
@@ -419,11 +449,11 @@ class Omq(commands.Cog):
         await ctx.send("서버의 지정곡 목록을 초기화 했습니다!")
        
        
-async def answer(message, cursor):
+async def answer(message, cursor, omqcog, ctx):
     channel = message.channel
             
     # read pending quiz data
-    checkQuery = "SELECT * from OmqRound where channel_id = ?;"
+    checkQuery = "SELECT * from OmqRoundAnswer where channel_id = ?;"
     cursor.execute(checkQuery, (channel.id,))
     record = cursor.fetchall()
     
@@ -431,13 +461,14 @@ async def answer(message, cursor):
         return
      
     answer = message.content.replace(" ", "").lower()
-    true_answer = record[0][2].replace(" ", "").lower()
+    true_answer = record[0][1].replace(" ", "").lower()
     
     if answer == true_answer:
         # remove quiz from database
-        removeQuery = "DELETE from OmqRound where channel_id = ?;"
+        removeQuery = "DELETE from OmqRoundAnswer where channel_id = ?;"
         cursor.execute(removeQuery, (channel.id,))
         
         rowcount = cursor.rowcount
         if rowcount  > 0:
             await channel.send("정답입니다, " + message.author.display_name + "님!")
+            await omqcog.play(ctx, True)
