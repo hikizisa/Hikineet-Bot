@@ -32,7 +32,7 @@ except sqlite3.Error as error:
  
 
 def get_prefix(bot, message):
-    prefixes = ['!']
+    prefixes = ['?']
 
     # Check to see if we are outside of a guild. e.g DM's etc.
     if not message.guild:
@@ -60,13 +60,26 @@ def shutdown_bot():
 
 @bot.command(name='shutdown')
 async def shutdown(ctx):
-    print(ctx.author.id, HOST)
     if ctx.author.id == int(HOST):
         await ctx.send("봇을 종료합니다.")
         shutdown_bot()
     else:
         await ctx.send("권한이 없습니다.")
+    
 
+@bot.command(name='say')
+async def say(ctx, *args):
+    if ctx.author.id == int(HOST):
+        msg = " ".join(args)
+        await ctx.send(msg)
+    else:
+        await ctx.send("권한이 없습니다.")
+
+
+@bot.command(name='info')
+async def info(ctx, *args):
+    pass
+    
 
 def isInt(s):
     try: 
@@ -85,7 +98,7 @@ async def on_ready():
         print(
             f'{guild.name}(id: {guild.id})'
         )
-    activity=discord.Activity(type=discord.ActivityType.watching, name="cute Yue chan")
+    activity=discord.Activity(type=discord.ActivityType.watching, name="dmld")
 
     await bot.change_presence(activity=activity)
 
@@ -103,19 +116,36 @@ async def on_member_join(member):
 @bot.event
 async def on_message(message):
     ctx = await bot.get_context(message)
+    
+    if ' ' not in message.content:
+        compo = message.content.split('/')
+        if len(compo) >= 5:
+            if compo[2] == "discord.com" and compo[3] == "channels":
+                print(message.content)
+                try:
+                    chn = bot.get_channel(int(compo[-2]))
+                    server = bot.get_guild(int(compo[-3]))
+                    msg = await chn.fetch_message(int(compo[-1]))
+                
+                    embed = discord.Embed(title = '%s - %s' % (server.name, chn.name),
+                         description = msg.content,
+                         color = 0xecce8b,
+                    )
+                    
+                    await message.channel.send(embed = embed)
+
+                except:
+                    pass
+            
     if message.author == bot.user:
         return
 
     if '오네쨩' == message.content:
         response = '<:emoji_90:660939513299992576>'
         await message.channel.send(response)
-		
-    if '유니콘은' == message.content:
-        response = '살아있어'
-        await message.channel.send(response)
-
-    if '이의있소' == message.content:
-        response = '<:8_:625386426447429643><:7_:625386445372260353>'
+        
+    if '<a:fastratJAM:811561886188568576>' == message.content:
+        response = '<a:WatameBang:812993518686699550>'
         await message.channel.send(response)
 
     await answer(message, cursor, omqcog, ctx)

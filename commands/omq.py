@@ -34,7 +34,7 @@ class Omq(commands.Cog):
         
         queries = []
         queries.append("DROP TABLE IF EXISTS OmqRoundAnswer;")
-        queries.append("CREATE TABLE IF NOT EXISTS OmqRoundAnswer (channel_id INT, round_id INT, song_name STRING);")
+        queries.append("CREATE TABLE IF NOT EXISTS OmqRoundAnswer (channel_id INT, round_id INT, song_name STRING, tries INT);")
         queries.append("DROP TABLE IF EXISTS OmqRoundScore;")
         queries.append("CREATE TABLE IF NOT EXISTS OmqRoundScore (channel_id INT, user_id STRING, score INT);")
         queries.append("DROP TABLE IF EXISTS OmqRound;")
@@ -225,6 +225,8 @@ class Omq(commands.Cog):
                 await ctx.send("진행 중인 라운드가 없습니다.")
             return
         
+        cont = record[0][3] > 0
+        
         rowcount = 0
         if len(record) > 0:
             if round_id is None:
@@ -242,9 +244,12 @@ class Omq(commands.Cog):
                 await ctx.send("라운드가 취소되었습니다!")
             else:
                 await channel.send("시간이 초과되었습니다.")
-            await channel.send("정답은 `" + record[0][1] + "`입니다!")
+            await channel.send("정답은 `" + record[0][2] + "`입니다!")
             
-            await self.play(ctx, True)
+            if (not cont) and (round_id is not None):
+                await channel.send("참여중인 사람이 없어 라운드를 종료합니다.")
+            else:
+                await self.play(ctx, True)
 
 
     @omq.command(name='pass')
@@ -264,19 +269,8 @@ class Omq(commands.Cog):
                 await ctx.send("이미 라운드가 진행중입니다!")
             return
         
-        # Retrieve quiz settings and songs in the server
-        guild_id = ctx.guild.id
-        selectQuery = "SELECT * from OsuQuiz where server_id = ? ORDER BY RANDOM() LIMIT 1;"
-        cursor.execute(selectQuery, (guild_id,))
-        record = cursor.fetchall()
-        
-        if len(record) == 0:
-            await ctx.send("등록된 곡이 없습니다!")
-            return
-
-        answer = record[0][2]
-        
         # Check server settings
+        guild_id = ctx.guild.id
         checkQuery = "SELECT * from OsuQuizSettings where server_id = ?;"
         cursor.execute(checkQuery, (guild_id,))
         settings = cursor.fetchall()
@@ -287,16 +281,36 @@ class Omq(commands.Cog):
             length = settings[0][1]
             timeout = settings[0][2]
         
-        # Cut mp3 following server setting
-        omq_song = "./tmp/audios/omq/" + str(record[0][1]) + '.mp3'
-        omq_song_cut = "./tmp/audios/omq/" + str(record[0][1]) + 'cut.mp3'
-        
         sound = None
-        try:
-            sound = AudioSegment.from_mp3(omq_song)
-        except:
-            await ctx.send("출제 중 오류가 발생했습니다! 다시 시도해주세요.")
-            return
+        
+        count_try = 0
+        while True:
+            try:
+                # Retrieve songs used in the server
+                selectQuery = "SELECT * from OsuQuiz where server_id = ? ORDER BY RANDOM() LIMIT 1;"
+                cursor.execute(selectQuery, (guild_id,))
+                record = cursor.fetchall()
+                
+                if len(record) == 0:
+                    await ctx.send("등록된 곡이 없습니다!")
+                    return
+
+                answer = record[0][2]
+                
+                # Cut mp3 following server setting
+                omq_song = "./tmp/audios/omq/" + str(record[0][1]) + '.mp3'
+                omq_song_cut = "./tmp/audios/omq/" + str(record[0][1]) + 'cut.mp3'
+                sound = AudioSegment.from_mp3(omq_song)
+                
+                break
+
+            except:
+                count_try += 1
+                if count_try < 10:
+                    continue
+                else:
+                    await ctx.send("출제에 오류가 발생했습니다! 퀴즈를 종료합니다.")
+                    return
             
         if len(sound) > length:
             sound = sound[:length]
@@ -305,10 +319,11 @@ class Omq(commands.Cog):
         if answer.replace(" ", "") == "":
             return
         
-        # Add round to database
-        quiz_round_query = "INSERT INTO OmqRoundAnswer SELECT ?, ?, ? WHERE NOT EXISTS(SELECT 1 FROM OmqRoundAnswer where channel_id = ?);"
-        record = cursor.execute(quiz_round_query, (ctx.channel.id, answer, self.round_id, ctx.channel.id))
         self.round_id += 1
+        
+        # Add round to database
+        quiz_round_query = "INSERT INTO OmqRoundAnswer SELECT ?, ?, ?, 0 WHERE NOT EXISTS(SELECT 1 FROM OmqRoundAnswer where channel_id = ?);"
+        record = cursor.execute(quiz_round_query, (ctx.channel.id, self.round_id, answer, ctx.channel.id))
         
         if cursor.rowcount >= 1:
             # Send messages
@@ -461,7 +476,11 @@ async def answer(message, cursor, omqcog, ctx):
         return
      
     answer = message.content.replace(" ", "").lower()
-    true_answer = record[0][1].replace(" ", "").lower()
+    true_answer = record[0][2].replace(" ", "").lower()
+    
+    countQuery = "UPDATE OmqRoundAnswer SET tries = tries + 1 WHERE channel_id = ?"
+    cursor.execute(countQuery, (channel.id,))
+    record = cursor.fetchall()
     
     if answer == true_answer:
         # remove quiz from database
