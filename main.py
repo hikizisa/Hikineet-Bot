@@ -112,10 +112,26 @@ async def on_member_join(member):
     )
 '''
 
+llast_msg = {}
+last_msg = {}
 
 @bot.event
 async def on_message(message):
+    global llast_msg
+    global last_msg
     ctx = await bot.get_context(message)
+    
+    repl = False
+    cid = message.channel.id
+    if cid in last_msg and last_msg[cid] == message.content and not (cid in llast_msg and llast_msg[cid] == message.content):
+        repl = True
+    
+    if cid in last_msg:
+        llast_msg[cid] = last_msg[cid]
+    last_msg[cid] = message.content
+    
+    if repl:
+        await message.channel.send(message.content)
     
     if ' ' not in message.content:
         compo = message.content.split('/')
