@@ -115,29 +115,35 @@ async def on_member_join(member):
 llast_msg = {}
 last_msg = {}
 
-@bot.event
-async def on_message(message):
+async def copypasta(message):
+# gonna do something with https://pypi.org/project/python-sql/ later
     global llast_msg
     global last_msg
-    ctx = await bot.get_context(message)
     
     repl = False
     cid = message.channel.id
-    if cid in last_msg and last_msg[cid] == message.content and not (cid in llast_msg and llast_msg[cid] == message.content):
+    if (cid in last_msg and last_msg[cid].content == message.content and
+        not (cid in llast_msg and llast_msg[cid].content == message.content) and
+        not last_msg[cid].author.id == message.author.id and
+        not last_msg[cid].author.bot):
         repl = True
     
     if cid in last_msg:
         llast_msg[cid] = last_msg[cid]
-    last_msg[cid] = message.content
+    last_msg[cid] = message
     
-    if repl:
+    if repl and len(message.content) > 0:
         await message.channel.send(message.content)
+
+@bot.event
+async def on_message(message):
+    await copypasta(message)
+    ctx = await bot.get_context(message)
     
     if ' ' not in message.content:
         compo = message.content.split('/')
         if len(compo) >= 5:
             if compo[2] == "discord.com" and compo[3] == "channels":
-                print(message.content)
                 try:
                     chn = bot.get_channel(int(compo[-2]))
                     server = bot.get_guild(int(compo[-3]))
