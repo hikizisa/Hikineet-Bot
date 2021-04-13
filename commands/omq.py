@@ -464,30 +464,32 @@ class Omq(commands.Cog):
         await ctx.send("서버의 지정곡 목록을 초기화 했습니다!")
        
        
-async def answer(message, cursor, omqcog, ctx):
-    channel = message.channel
-            
-    # read pending quiz data
-    checkQuery = "SELECT * from OmqRoundAnswer where channel_id = ?;"
-    cursor.execute(checkQuery, (channel.id,))
-    record = cursor.fetchall()
-    
-    if len(record) == 0:
-        return
-     
-    answer = message.content.replace(" ", "").lower()
-    true_answer = record[0][2].replace(" ", "").lower()
-    
-    countQuery = "UPDATE OmqRoundAnswer SET tries = tries + 1 WHERE channel_id = ?"
-    cursor.execute(countQuery, (channel.id,))
-    record = cursor.fetchall()
-    
-    if answer == true_answer:
-        # remove quiz from database
-        removeQuery = "DELETE from OmqRoundAnswer where channel_id = ?;"
-        cursor.execute(removeQuery, (channel.id,))
+    async def on_message(self, message):
+        channel = message.channel
+        cursor = self.cursor
+                
+        # read pending quiz data
+        checkQuery = "SELECT * from OmqRoundAnswer where channel_id = ?;"
+        cursor.execute(checkQuery, (channel.id,))
+        record = cursor.fetchall()
         
-        rowcount = cursor.rowcount
-        if rowcount  > 0:
-            await channel.send("정답입니다, " + message.author.display_name + "님!")
-            await omqcog.play(ctx, True)
+        if len(record) == 0:
+            return
+         
+        answer = message.content.replace(" ", "").lower()
+        true_answer = record[0][2].replace(" ", "").lower()
+        
+        countQuery = "UPDATE OmqRoundAnswer SET tries = tries + 1 WHERE channel_id = ?"
+        cursor.execute(countQuery, (channel.id,))
+        record = cursor.fetchall()
+        
+        if answer == true_answer:
+            # remove quiz from database
+            removeQuery = "DELETE from OmqRoundAnswer where channel_id = ?;"
+            cursor.execute(removeQuery, (channel.id,))
+            
+            rowcount = cursor.rowcount
+            if rowcount  > 0:
+                await channel.send("정답입니다, " + message.author.display_name + "님!")
+                ctx = await self.bot.get_context(message)
+                await self.play(ctx, True)

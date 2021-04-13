@@ -1,5 +1,6 @@
 .env
-onee_chan.db
+bot.db
 __pycache__/
-onee_chan.db-journal
+bot.db-journal
 /tmp
+*.c
