@@ -1,0 +1,35 @@
+import nextcord
+from nextcord.ext import commands
+import torch
+from transformers import PreTrainedTokenizerFast
+from transformers import GPT2LMHeadModel
+            
+class GPT_Gen(commands.Cog):
+    def __init__(self, bot):
+        self.bot = bot
+        self.model = GPT2LMHeadModel.from_pretrained('skt/kogpt2-base-v2')
+        self.tokenizer = tokenizer = PreTrainedTokenizerFast.from_pretrained("skt/kogpt2-base-v2",
+            bos_token='</s>', eos_token='</s>', unk_token='<unk>',
+            pad_token='<pad>', mask_token='<mask>')
+
+    @commands.command(name='gen')
+    async def generate(self, ctx, *args):
+        length = 32
+        msg = ""
+        try:
+            length = int(args[-1])
+            msg = " ".join(args[:-1])
+        except:
+            msg = " ".join(args)
+
+        input_ids = self.tokenizer.encode(msg)
+        gen_ids = self.model.generate(torch.tensor([input_ids]),
+           max_length=length,
+           repetition_penalty=2.0,
+           pad_token_id=self.tokenizer.pad_token_id,
+           eos_token_id=self.tokenizer.eos_token_id,
+           bos_token_id=self.tokenizer.bos_token_id,
+           use_cache=True)
+        generated = self.tokenizer.decode(gen_ids[0,:].tolist())
+        await ctx.send(generated)
+        

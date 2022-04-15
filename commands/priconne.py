@@ -1,5 +1,5 @@
-import discord
-from discord.ext import commands
+import nextcord
+from nextcord.ext import commands
 import random
 import os
 import requests
@@ -114,7 +114,7 @@ class Priconne(commands.Cog):
         gacha_result.save(res_image_path)
         
         image = open(res_image_path, 'rb')
-        await ctx.send(file=discord.File(fp=image, filename="result.jpg"), content=res_str)
+        await ctx.send(file=nextcord.File(fp=image, filename="result.jpg"), content=res_str)
         image.close()
         
         try:

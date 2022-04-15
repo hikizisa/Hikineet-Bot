@@ -1,6 +1,6 @@
 import os
-import discord
-from discord.ext import commands
+import nextcord
+from nextcord.ext import commands
 from datetime import date, datetime, time, timedelta, timezone
 import urllib.parse
 import requests
@@ -9,7 +9,7 @@ import requests
 '''
 @bot.command(name='tp')
 async def timing_point(ctx):
-    embed = discord.Embed(title='Timing Point',
+    embed = nextcord.Embed(title='Timing Point',
         url='osu://edit/00:00:000',
         description='00:00:000')
     await ctx.send(embed = embed)
@@ -68,7 +68,10 @@ class Osu(commands.Cog):
             help += 'osu who : 해당 유저의 osu! 정보를 표시합니다.\n'
             help += 'osu nr : 최신 랭크맵 목록을 보여줍니다.'
             await ctx.send(help)
-
+            
+    @osu.command(name='mirror')
+    async def mirror_osu(self, ctx, *args):
+        pass
 
     @osu.command(name='who')
     async def who_osu(self, ctx, *args):
@@ -87,7 +90,7 @@ class Osu(commands.Cog):
             await ctx.send('먼저 osu! 계정을 등록해주세요.')
             return
 
-        embed = discord.Embed(title=record[0][1], url='https://osu.ppy.sh/users/' + str(record[0][0]),
+        embed = nextcord.Embed(title=record[0][1], url='https://osu.ppy.sh/users/' + str(record[0][0]),
             description=record[0][0], color=0xecce8b)
         embed.set_image(url = 'https://a.ppy.sh/' + str(record[0][0]) + '_.jpeg')
 
@@ -201,7 +204,7 @@ class Osu(commands.Cog):
                  continue
              map_titles.append(title)
 
-             embed = discord.Embed(title = title,
+             embed = nextcord.Embed(title = title,
                  url = 'https://osu.ppy.sh/s/' + beatmap['beatmapset_id'],
                  description = beatmap['approved_date'] + '\n' + 'Mapset by ' + beatmap['creator'] + '\n',
                  color = 0xecce8b,

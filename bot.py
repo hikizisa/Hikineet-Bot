@@ -2,14 +2,15 @@
 import signal, sys, os
 import sqlite3
 
-import discord
-from discord.ext import commands
+import nextcord
+from nextcord.ext import commands
 from dotenv import load_dotenv
 
 from commands.omq import Omq
+from commands.osu import Osu
 from commands.basics import Basics
 from commands.priconne import Priconne
-from commands.osu import Osu
+from commands.Translate import Translate
 
 load_dotenv()
 
@@ -48,7 +49,7 @@ def main():
  
 
     def get_prefix(bot, message):
-        prefixes = ['?']
+        prefixes = ['&']
 
         # Check to see if we are outside of a guild. e.g DM's etc.
         if not message.guild:
@@ -58,14 +59,16 @@ def main():
         # If we are in a guild, we allow for the user to mention us or use any of the prefixes in our list.
         return commands.when_mentioned_or(*prefixes)(bot, message)
 
-    bot = commands.Bot(command_prefix=get_prefix, description='HikiNeet bot for coding practice', case_insensitive=True)
+    bot = commands.Bot(command_prefix=get_prefix, description='HikiNeet bot for coding practice', case_insensitive=True, guild_subscriptions=True, intents=nextcord.Intents.all())
     
     base_cog = Base(bot, cursor)
     bot.add_cog(base_cog)
     base_cog.more_cog(Omq(bot, cursor))
     base_cog.more_cog(Basics(bot, cursor, sqliteConnection))
-    base_cog.more_cog(Osu(bot, cursor))
     base_cog.more_cog(Priconne(bot))
+    base_cog.more_cog(Osu(bot, cursor))
+    base_cog.more_cog(Translate(bot))
+    print("Bot is running")
     bot.run(TOKEN)
 
 if __name__ == "__main__":

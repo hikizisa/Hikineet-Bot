@@ -3,8 +3,8 @@
 # play command : retry on error
 
 import os
-import discord
-from discord.ext import commands
+import nextcord
+from nextcord.ext import commands
 import time as timer
 from datetime import date, datetime, time, timedelta, timezone
 import urllib.parse
@@ -16,21 +16,37 @@ from io import BytesIO
 from pydub import AudioSegment
 from threading import Timer
 
+def levenshteinDistance(s1, s2):
+    if len(s1) > len(s2):
+        s1, s2 = s2, s1
+
+    distances = range(len(s1) + 1)
+    for i2, c2 in enumerate(s2):
+        distances_ = [i2+1]
+        for i1, c1 in enumerate(s1):
+            if c1 == c2:
+                distances_.append(distances[i1])
+            else:
+                distances_.append(1 + min((distances[i1], distances[i1 + 1], distances_[-1])))
+        distances = distances_
+    return distances[-1]
+
 
 class Omq(commands.Cog):
-    def __init__(self, bot, cursor):
+    def __init__(self, bot, cursor, use_cache):
         self.bot = bot
         self.round_id = 0
         
         self.cursor = cursor
         
-        omq_song_dir = "./tmp/audios/omq/"
-        if not os.path.exists(omq_song_dir):
-            os.makedirs(omq_song_dir)
-            
-        omq_txt_dir = "./tmp/texts/omq"
-        if not os.path.exists(omq_txt_dir):
-            os.makedirs(omq_txt_dir)
+        if use_cache:
+            omq_song_dir = "./tmp/audios/omq/"
+            if not os.path.exists(omq_song_dir):
+                os.makedirs(omq_song_dir)
+                
+            omq_txt_dir = "./tmp/texts/omq"
+            if not os.path.exists(omq_txt_dir):
+                os.makedirs(omq_txt_dir)
         
         queries = []
         queries.append("DROP TABLE IF EXISTS OmqRoundAnswer;")
@@ -153,7 +169,7 @@ class Omq(commands.Cog):
         else:
             updateQuery = "UPDATE OsuQuizSettings SET length = ? WHERE server_id = ?;"
             cursor.execute(updateQuery, (length, guild_id))
-        await ctx.send("프리뷰 길이를 " + str(length) + "초로 설정했습니다!")
+        await ctx.send("프리뷰 길이를 " + str(length) + "ms로 설정했습니다!")
         
     
     @omq.command(name='stop')
@@ -257,7 +273,7 @@ class Omq(commands.Cog):
         await self.game_over(ctx, 0)
 
 
-    @omq.command(name='play')
+    @omq.command(name='play',aliases=['start'])
     async def play(self, ctx, auto = False, *args):
         cursor = self.cursor
         
@@ -329,7 +345,7 @@ class Omq(commands.Cog):
             # Send messages
             await ctx.send("곡 제목을 맞춰주세요!")
             mp3 = open(omq_song_cut, 'rb') 
-            await ctx.send(file=discord.File(fp=mp3, filename="quiz.mp3"))
+            await ctx.send(file=nextcord.File(fp=mp3, filename="quiz.mp3"))
             mp3.close()
             await ctx.send("`" + ''.join(c if not (c.isalpha() or c.isnumeric()) else '#' for c in answer) + "`")
             
@@ -425,7 +441,7 @@ class Omq(commands.Cog):
             return
 
         txt = open("./tmp/texts/omq/backup.txt", 'rb')
-        await ctx.send(file=discord.File(fp=txt, filename="songlist.txt"))
+        await ctx.send(file=nextcord.File(fp=txt, filename="songlist.txt"))
         txt.close()
 
 
@@ -465,6 +481,9 @@ class Omq(commands.Cog):
        
        
     async def on_message(self, message):
+        if message.author.bot:
+            return
+
         channel = message.channel
         cursor = self.cursor
                 
@@ -477,13 +496,15 @@ class Omq(commands.Cog):
             return
          
         answer = message.content.replace(" ", "").lower()
+        answer_original = record[0][2]
         true_answer = record[0][2].replace(" ", "").lower()
         
         countQuery = "UPDATE OmqRoundAnswer SET tries = tries + 1 WHERE channel_id = ?"
         cursor.execute(countQuery, (channel.id,))
         record = cursor.fetchall()
         
-        if answer == true_answer:
+        error = levenshteinDistance(answer, true_answer)
+        if error <= int(len(true_answer) * 0.2):
             # remove quiz from database
             removeQuery = "DELETE from OmqRoundAnswer where channel_id = ?;"
             cursor.execute(removeQuery, (channel.id,))
@@ -491,5 +512,7 @@ class Omq(commands.Cog):
             rowcount = cursor.rowcount
             if rowcount  > 0:
                 await channel.send("정답입니다, " + message.author.display_name + "님!")
+                if error > 0:
+                    await channel.send("정확한 정답은 {}입니다.".format(answer_original))
                 ctx = await self.bot.get_context(message)
                 await self.play(ctx, True)
