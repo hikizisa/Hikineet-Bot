@@ -16,6 +16,14 @@ from io import BytesIO
 from pydub import AudioSegment
 from threading import Timer
 
+'''
+# Return whole image object
+return image
+
+self.convert_bytes(image_bytes, top_text, bottom_text).save('image.png')
+await ctx.send(file=discord.File('image.png'))
+'''
+
 def levenshteinDistance(s1, s2):
     if len(s1) > len(s2):
         s1, s2 = s2, s1

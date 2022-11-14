@@ -69,17 +69,18 @@ try:
         print(i, ": ", option)
     print("==")
 
-    while choice is None:
-        try:
-            choice = int(input())
-        except:
-            continue
+    #while choice is None:
+    #    try:
+    #        choice = int(input())
+    #    except:
+    #        continue
     
-    if 0 <= choice < len(func):
-        func[choice](cursor)
-    else:
-        for i in range(len(func)):
-            func[i](cursor)
+    for choice in range(len(func)):
+        if 0 <= choice < len(func):
+            func[choice](cursor)
+        else:
+            for i in range(len(func)):
+                func[i](cursor)
 
     cursor.close()
 
